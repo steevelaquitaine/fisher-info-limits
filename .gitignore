@@ -1,3 +1,6 @@
 Bayes_Dec_Errs_500reps_thetastep2.npz
 DS_cells.pkl
 Stretch_BioQuads_multiplied_w_mean_g__theta_step=2_original_g_20240509_AREA.pkl
+
+# virtuel environment
+envs/fisher_info_limits
