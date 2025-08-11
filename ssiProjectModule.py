@@ -103,6 +103,20 @@ def VON_MISES(th, a, th_0, s, baseline):           #indexed with 'ftvm'
     vm_f = f(th, a, th_0, s)
     return (vm_f / np.sum(vm_f/a) + baseline)*(1 +any(vm_f / np.sum(vm_f/a) + baseline < 0)*1e10)
 
+def von_mises_tuning(theta, amplitude, preferred_angle, kappa, baseline=0):
+    """
+    Von Mises tuning function for circular data
+    
+    Args:
+        theta: stimulus angles (radians)
+        amplitude: peak response
+        preferred_angle: preferred angle (radians) 
+        kappa: concentration (larger = sharper tuning)
+        baseline: baseline firing rate
+    """
+    # Von Mises: exp(kappa * cos(theta - mu))
+    response = amplitude * np.exp(kappa * np.cos(theta - preferred_angle))
+    return np.maximum(response + baseline, 0)  # Ensure non-negative
 
 def FLAT_TOPPED_VON_MISES(th, a, th_0, s, baseline, g):           #indexed with 'ftvm'
     '''Modified Von Mises function\n Parameters Area, mean, concentration, baseline, flatness\n g = 0 gives Von Mises function'''
