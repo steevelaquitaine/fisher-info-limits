@@ -1,4 +1,6 @@
 
+# author: laquitainesteeve@gmail.com 
+
 # usage: 
 # 1. move to repo and create env with $ mamba env create -f envs/fisher_info_limits.yml --prefix ./envs/fisher_info_limits
 # 2. activate env: $ mamba activate ./envs/fisher_info_limits
