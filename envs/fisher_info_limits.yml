@@ -16,4 +16,5 @@ dependencies:
   - pip:
     - torch==2.2.2
     - pickle5
+    - tqdm==4.67.1
  
