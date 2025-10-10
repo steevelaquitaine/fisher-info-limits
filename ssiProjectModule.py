@@ -22,7 +22,7 @@ import os
 import ipykernel
 from shutil import copy2
 import sys
-
+from functools import reduce
 from scipy.stats import poisson as poi
 
 mpl.rcParams['axes.spines.right'] = False
@@ -209,6 +209,9 @@ def BIG_SSI(tcs):
     return np.squeeze(ssi_theta)
 
 
+
+
+
 def FISHER_POISSON(stim, tcs):
     lik_2d_spl = np.array([UnivariateSpline(stim, el, s = 0,k = 2).derivative(n=1)(stim) for el in tcs])
     fisher = np.sum(np.array([lik_2d_spl[i]**2./tcs[i] for i in range(len(tcs))]),  axis =0)
@@ -328,3 +331,130 @@ def FWHM(pars):
     idx = np.argmin(fcn**2)
 #     print(ftvm[idx])
     return ftvm[idx], 2*np.abs(x[idx]-pars[1])%360
+
+
+
+# ------------------------------------- SL--------------------------------------------
+
+def BIG_SSI2(tcs):
+    '''Takes an array of N tuning curves and returns the combined SSI
+    SUPPOSE NO CORRELATIONS -> p(n1,n2,...,nm|th) = p(n1|th)*p(n2|th)*...*p(nm|th)
+    Output in BITS.'''
+    
+    if tcs.ndim == 1:
+        return GET_SSI_FROM_TC(np.squeeze(tcs))
+    
+    # Compute likelihoods for each tuning curve
+    likelihoods = []
+    for el in tcs:
+        _, new_likelihood = POISSON(el)
+        likelihoods.append(new_likelihood)
+    
+    n_tuning_curves = len(tcs)
+    n_theta = len(tcs[0])
+    
+    # Construct multidimensional likelihood using dynamic broadcasting
+    # Create the appropriate shape for broadcasting each likelihood
+    multidim_likelihood = compute_multidim_likelihood(likelihoods)
+    
+    # Compute normalization
+    multidim_norm = np.sum(multidim_likelihood, axis=-1)
+    multidim_norm[multidim_norm == 0.] = 1e-20
+    
+    # Compute likelihood entropy
+    likelihood_entropy = -1. * np.sum(
+        multidim_likelihood * np.log(np.maximum(multidim_likelihood, 1e-10)), 
+        axis=-1
+    )
+    
+    # Compute multidimensional entropy
+    multidim_entropy = (likelihood_entropy / multidim_norm) + np.log(multidim_norm)
+    
+    # Clean up intermediate variables
+    del likelihood_entropy
+    del multidim_norm
+    
+    # Compute SSI
+    # Sum over all response dimensions (all axes except the last theta axis)
+    sum_axes = tuple(range(n_tuning_curves))
+    ssi_theta = np.log(n_theta) - np.sum(
+        multidim_likelihood * np.expand_dims(multidim_entropy, axis=-1), 
+        axis=sum_axes
+    )
+    
+    # Clean up
+    del multidim_likelihood
+    del multidim_entropy
+    
+    return np.squeeze(ssi_theta)
+
+
+def compute_multidim_likelihood(likelihoods):
+    '''Compute the product of likelihoods with proper broadcasting for any number of dimensions'''
+    n = len(likelihoods)
+    n_theta = likelihoods[0].shape[-1]
+    
+    # Reshape each likelihood for proper broadcasting
+    reshaped_likelihoods = []
+    for i, likelihood in enumerate(likelihoods):
+        # Create shape: (1, 1, ..., n_responses_i, 1, ..., 1, n_theta)
+        # where n_responses_i is at position i
+        new_shape = [1] * n + [n_theta]
+        new_shape[i] = likelihood.shape[0]
+        reshaped_likelihoods.append(likelihood.reshape(new_shape))
+    
+    # Multiply all reshaped likelihoods together
+    multidim_likelihood = reduce(np.multiply, reshaped_likelihoods)
+    
+    return multidim_likelihood
+
+
+def MC_SSI2(tcs_input):         #dim tcs = 4x36
+    ''' Calculates SSI by Monte Carlo method. \n Up to 2023-11-12 gives result in nats, from 2023-11-12 (included) gives result in bits'''
+    #if input is multiple cells
+#     K = 10000
+    
+    if tcs_input.ndim==1:
+        tcs = np.atleast_2d(tcs_input)
+    else:
+        tcs = np.copy(tcs_input)
+    posterior = np.array([])
+    stim_len = tcs.shape[-1]
+    K = 100
+    err = 1e4
+    epsilon = 1        #errors in percents
+
+    previous_ssi = np.zeros(stim_len)
+    if np.max(tcs_input)<20:
+        return BIG_SSI2(tcs_input)*np.log2(math.e)
+    
+    while (K<10000 and err>epsilon):
+        #get your K samples -> to be summed over at the end
+
+        sample_r = np.random.poisson(tcs, size = (K, *tcs.shape))     #dim = Kx4x36 for quadruplet
+    #     norm = np.sum(np.prod(np.maximum(poi.pmf(np.tile(sample_r[:,:,:,None], (1,1,1,stim_len)), \
+    #                           np.tile(tcs[None,:,None, :], (K,1, stim_len,1))), 1e-10), axis = 1), axis = -1)
+        post_aux = np.maximum(1e-40, \
+                              np.prod(np.maximum(poi.pmf(np.tile(sample_r[:,:,:,None], (1,1,1,stim_len)), \
+                              np.tile(tcs[None,:,None, :], (K,1, stim_len,1))), 1e-100), axis = 1))
+        posterior = post_aux / np.tile(np.sum(post_aux, axis = -1)[:,:,None], (1,1,stim_len))
+
+
+        i_sp = np.log(stim_len)+np.sum(posterior*np.maximum(np.log(posterior),-50), axis = 2)
+        ssi = np.mean(i_sp, axis = 0)
+        del sample_r, post_aux, posterior
+        err = np.sqrt(np.mean((ssi-previous_ssi)**2))/np.mean(ssi)*100
+        previous_ssi = np.copy(ssi)
+        K *=2
+        
+#     print(K)
+    del previous_ssi
+    
+
+    # if the number of samples has gotten bigger than 5000 and the error is still larger than epsilon
+    # then we're probably in the high noise regime, and it's best to compute the SSI exactly - use BIG_SSI     
+    #However if the TCs have a very high maximum average firing rate, then do not compute exactly in any case.
+
+    if K>=10000 and err>epsilon and np.max(tcs_input)<30:
+        ssi = BIG_SSI(tcs_input)
+    return ssi*np.log2(math.e)
