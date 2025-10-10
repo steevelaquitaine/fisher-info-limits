@@ -209,9 +209,6 @@ def BIG_SSI(tcs):
     return np.squeeze(ssi_theta)
 
 
-
-
-
 def FISHER_POISSON(stim, tcs):
     lik_2d_spl = np.array([UnivariateSpline(stim, el, s = 0,k = 2).derivative(n=1)(stim) for el in tcs])
     fisher = np.sum(np.array([lik_2d_spl[i]**2./tcs[i] for i in range(len(tcs))]),  axis =0)
