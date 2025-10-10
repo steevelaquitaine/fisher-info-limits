@@ -1,0 +1,26 @@
+# purpose: env for cases of 1D and natural images 
+#
+# author: laquitainesteeve@gmail.com 
+
+# usage: 
+# 1. move to repo and create env with $ mamba env create -f envs/fisher_info_limits2.yml --prefix ./envs/fisher_info_limits2
+# 2. activate env: $ mamba activate ./envs/fisher_info_limits2
+
+name: fisher_info_limits
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9.7
+  - pynwb=2.8.2
+  - ipykernel=6.29.5                   
+  - ipywidgets=8.0.6
+  - jupyter=1.0.0
+  - matplotlib=3.9.4
+  - scikit-learn
+  - scipy
+  - numba
+  - pip:
+    - pickle5
+    - tqdm==4.67.1
+    - torch --pre --index-url https://download.pytorch.org/whl/nightly/cu128        # machine learning: pytorch; 
+    - torchvision --pre --index-url https://download.pytorch.org/whl/nightly/cu128  # machine learning: torchvision
