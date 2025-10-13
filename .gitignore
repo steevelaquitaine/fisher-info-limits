@@ -3,7 +3,7 @@
 data/bayer_decoding_error/Bayes_Dec_Errs_500reps_thetastep2.npz
 data/DS_cells.pkl
 data/decoding_analysis/Stretch_BioQuads_multiplied_w_mean_g__theta_step=2_original_g_20240509_AREA.pkl
-data/contrast_cells/carlo_data_cellno2.mat
+data/contrast_cells/*
 data/computed_contrast_cells/*
 
 # virtuel environment
