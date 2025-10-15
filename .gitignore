@@ -6,6 +6,9 @@ data/decoding_analysis/Stretch_BioQuads_multiplied_w_mean_g__theta_step=2_origin
 data/contrast_cells/*
 data/computed_contrast_cells/*
 
+# figures
+figures/all/*
+
 # virtuel environment
 envs/fisher_info_limits
 envs/fisher_info_limits2

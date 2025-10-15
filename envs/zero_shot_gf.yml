@@ -1,0 +1,31 @@
+# Setup the conda virtual environment to run on GPU
+#
+# author: laquitainesteeve@gmail.com 
+#
+# Requirements: 
+#
+#  - conda 23.3.1
+#
+# Move to the root of the repository and install:
+#
+# 1. move to repo and create env with $ mamba env create -f envs/zero_shot_gf.yml --prefix ./envs/zero_shot_gf
+# 2. activate env: $ mamba activate ./envs/zero_shot_gf
+
+name: decoder_plugin
+channels:
+    - conda-forge
+    - huggingface
+dependencies:
+    - Python=3.10.16
+    - ipykernel
+    - matplotlib               # plotting
+    - datasets
+    - scipy
+    - black=24.10.0
+    - diffusers=0.32.2               # machine learning: diffusion models
+    - ipywidgets=8.1.5               # dynamic display [to remove with display code]
+    - pylint=3.3.5
+    - pip:
+        - torch; 
+        - torchvision
+        - --extra-index-url https://download.pytorch.org/whl/cu121

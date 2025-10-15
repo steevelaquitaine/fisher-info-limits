@@ -1,7 +1,11 @@
-# purpose: env for cases of 1D and natural images 
+# Setup virtual environment
 #
 # author: laquitainesteeve@gmail.com 
-
+#
+# Requirements:
+#
+#  - conda 23.3.1
+#
 # usage: 
 # 1. move to repo and create env with $ mamba env create -f envs/fisher_info_limits2.yml --prefix ./envs/fisher_info_limits2
 # 2. activate env: $ mamba activate ./envs/fisher_info_limits2

@@ -1,4 +1,12 @@
-"""_summary_
+"""Create figure 3
+
+author: Carlo Paris & laquitainesteeve@gmail.com 
+
+Usage:
+    
+    # setup conda environment, activate and run pipeline
+    conda activate envs/fisher_info_limits2
+    python src/pipes/fig3.py
 
 Returns:
     _type_: _description_
@@ -294,6 +302,8 @@ if __name__ == "__main__":
             print("Loaded precomputed data:", out.keys())
 
         # PLOT -------------------------------------------------------------------------------------------
+        xylim = (-3,3)
+        xyticks = (-3,0,3)
 
         # setup plot
         fig = plt.figure(figsize=(2,6))
@@ -318,15 +328,16 @@ if __name__ == "__main__":
         scatter_hist(pcs[0], pcs[1], axs['scatter'], axs['histx'], axs['histy'], c=(.7,0.7,0.7))
         axs['scatter'].set_xlabel('Receptive field PC1')
         axs['scatter'].set_ylabel('Receptive field PC2')
-        axs['scatter'].set_xlim([-5,5])
-        axs['scatter'].set_ylim([-5,5])
+        axs['scatter'].set_xlim(xylim)
+        axs['scatter'].set_ylim(xylim)
+        axs['scatter'].set_xticks(xyticks,xyticks)
+        axs['scatter'].set_yticks(xyticks,xyticks)
 
         # plot prior (contours)
         for n_std in np.arange(0, 5, 1):
             plot_gaussian_ellipse(np.array([mu0, mu1]), sigma, 
-                                axs['scatter'], n_std=n_std, 
-                                edgecolor='red', facecolor='None')
-        axs['scatter'].legend(['','Prior'], frameon=False, bbox_to_anchor=(0.75,0.75))
+                                    axs['scatter'], n_std=n_std, 
+                                    edgecolor='red', facecolor='None')
 
         # aesthetics
         axs['scatter'].spines[['top','right']].set_visible(False)
@@ -348,8 +359,8 @@ if __name__ == "__main__":
         # plot prior
         for n_std in np.arange(0, 6, 1):
             plot_gaussian_ellipse(np.array([mu0, mu1]), sigma, 
-                                ax_bottom, n_std=n_std, 
-                                edgecolor='red', facecolor='None')
+                                    ax_bottom, n_std=n_std, 
+                                    edgecolor='red', facecolor='None')
 
         # add colorbar
         plt.colorbar(contour, ax=ax_bottom, label="Fitted neural response")
@@ -358,10 +369,11 @@ if __name__ == "__main__":
         ax_bottom.spines[['right']].set_visible(False)
         ax_bottom.set_xlabel("Receptive field PC1")
         ax_bottom.set_ylabel("Receptive field PC2")
-        ax_bottom.set_xlim(-5,5)
-        ax_bottom.set_ylim(-5,5)
-        ax_bottom.set_xticks((-5,0,5),(-5,0,5))
-        ax_bottom.set_yticks((-5,0,5),(-5,0,5))
+        ax_bottom.set_xlim(xylim)
+        ax_bottom.set_ylim(xylim)
+        ax_bottom.set_xticks(xyticks,xyticks)
+        ax_bottom.set_yticks(xyticks,xyticks)
+        ax_bottom.legend(['Prior'], frameon=False, loc="upper right")
 
 
         # Third subplot: plot SSI ----------------------------------------------------
