@@ -326,8 +326,8 @@ if __name__ == "__main__":
 
         # plot scatter points and histograms
         scatter_hist(pcs[0], pcs[1], axs['scatter'], axs['histx'], axs['histy'], c=(.7,0.7,0.7))
-        axs['scatter'].set_xlabel('Receptive field PC1')
-        axs['scatter'].set_ylabel('Receptive field PC2')
+        axs['scatter'].set_xlabel('Image PC1')
+        axs['scatter'].set_ylabel('Image PC2')
         axs['scatter'].set_xlim(xylim)
         axs['scatter'].set_ylim(xylim)
         axs['scatter'].set_xticks(xyticks,xyticks)
@@ -367,8 +367,8 @@ if __name__ == "__main__":
 
         # aesthetics
         ax_bottom.spines[['right']].set_visible(False)
-        ax_bottom.set_xlabel("Receptive field PC1")
-        ax_bottom.set_ylabel("Receptive field PC2")
+        ax_bottom.set_xlabel("Image PC1")
+        ax_bottom.set_ylabel("Image PC2")
         ax_bottom.set_xlim(xylim)
         ax_bottom.set_ylim(xylim)
         ax_bottom.set_xticks(xyticks,xyticks)
@@ -387,8 +387,8 @@ if __name__ == "__main__":
         divider = make_axes_locatable(ax_bottom3) # colorbar
         cax = divider.append_axes("right", size="10%", pad=0.3)
         cbar = plt.colorbar(im, cax=cax)
-        ax_bottom3.set_xlabel("Receptive field PC1")
-        ax_bottom3.set_ylabel("Receptive field PC2")
+        ax_bottom3.set_xlabel("Image PC1")
+        ax_bottom3.set_ylabel("Image PC2")
 
         fig.subplots_adjust(wspace=0.9, hspace=0.5)
 
