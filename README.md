@@ -15,3 +15,8 @@ Data from 41 Retina Ganglion Cells:
 
 * Data/contrast_cells/ contains receptive field data (709M)
 * Data/computed_contrast_cells/ contains computed Bayes error and SSI.
+
+
+# How-to
+
+- Run notebooks in notebook/
