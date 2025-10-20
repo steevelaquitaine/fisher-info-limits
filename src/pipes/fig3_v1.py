@@ -306,19 +306,17 @@ if __name__ == "__main__":
         xyticks = (-3,0,3)
 
         # setup plot
-        fig = plt.figure(figsize=(1.7,6))
+        fig = plt.figure(figsize=(2,6))
 
         # create main GridSpec: 1 col, 2 rows
-        #height_ratios: size of each axis
-        gs_main = gridspec.GridSpec(3,1, figure=fig, wspace=0, height_ratios=[1.5,1,1]) 
+        gs_main = gridspec.GridSpec(3,1, figure=fig, wspace=0.3)
 
-        # Second subplot: Stimulus pcs & histogram --------------------------------------------------------------------------------
-
+        # setup (pc1, 2) data points & histogram plot
         gs_top =  gridspec.GridSpecFromSubplotSpec(2, 2, 
                                                 subplot_spec=gs_main[0],
                                                 width_ratios=[4, 1], 
                                                 height_ratios=[1, 4],
-                                                hspace=0.5, wspace=0.2)
+                                                hspace=0.5, wspace=0.1)
 
         # create axes for the mosaic
         axs = {}
@@ -328,9 +326,8 @@ if __name__ == "__main__":
 
         # plot scatter points and histograms
         scatter_hist(pcs[0], pcs[1], axs['scatter'], axs['histx'], axs['histy'], c=(.7,0.7,0.7))
-        # axs['scatter'].set_aspect('equal')
-        axs['scatter'].set_xlabel('Natural image PC1')
-        axs['scatter'].set_ylabel('Natural image PC2')
+        axs['scatter'].set_xlabel('Image PC1')
+        axs['scatter'].set_ylabel('Image PC2')
         axs['scatter'].set_xlim(xylim)
         axs['scatter'].set_ylim(xylim)
         axs['scatter'].set_xticks(xyticks,xyticks)
@@ -339,8 +336,8 @@ if __name__ == "__main__":
         # plot prior (contours)
         for n_std in np.arange(0, 5, 1):
             plot_gaussian_ellipse(np.array([mu0, mu1]), sigma, 
-                                axs['scatter'], n_std=n_std, 
-                                edgecolor='red', facecolor='None')
+                                    axs['scatter'], n_std=n_std, 
+                                    edgecolor='red', facecolor='None')
 
         # aesthetics
         axs['scatter'].spines[['top','right']].set_visible(False)
@@ -351,7 +348,7 @@ if __name__ == "__main__":
 
         # Second subplot: Tuning curve and prior --------------------------------------------------------------------------------
 
-        ax_bottom = fig.add_subplot(gs_main[1], )
+        ax_bottom = fig.add_subplot(gs_main[1])
 
         # plot contours
         contour_levels = np.linspace(0, np.max(preds), 20)
@@ -362,24 +359,21 @@ if __name__ == "__main__":
         # plot prior
         for n_std in np.arange(0, 6, 1):
             plot_gaussian_ellipse(np.array([mu0, mu1]), sigma, 
-                                ax_bottom, n_std=n_std, 
-                                edgecolor='red', facecolor='None')
+                                    ax_bottom, n_std=n_std, 
+                                    edgecolor='red', facecolor='None')
 
         # add colorbar
         plt.colorbar(contour, ax=ax_bottom, label="Fitted neural response")
 
         # aesthetics
-        # ax_bottom.set_aspect('equal')
-
         ax_bottom.spines[['right']].set_visible(False)
-        ax_bottom.set_xlabel("Natural image PC1")
-        ax_bottom.set_ylabel("Natural image PC2")
+        ax_bottom.set_xlabel("Image PC1")
+        ax_bottom.set_ylabel("Image PC2")
         ax_bottom.set_xlim(xylim)
         ax_bottom.set_ylim(xylim)
         ax_bottom.set_xticks(xyticks,xyticks)
         ax_bottom.set_yticks(xyticks,xyticks)
         ax_bottom.legend(['Prior'], frameon=False, loc="upper right")
-
 
 
         # Third subplot: plot SSI ----------------------------------------------------
@@ -392,9 +386,9 @@ if __name__ == "__main__":
         ax_bottom3.set_yticks(np.arange(0,300,100), np.arange(0,300,100))
         divider = make_axes_locatable(ax_bottom3) # colorbar
         cax = divider.append_axes("right", size="10%", pad=0.3)
-        cbar = plt.colorbar(im, cax=cax)    
-        ax_bottom3.set_xlabel("Natural image PC1")
-        ax_bottom3.set_ylabel("Natural image PC2")
+        cbar = plt.colorbar(im, cax=cax)
+        ax_bottom3.set_xlabel("Image PC1")
+        ax_bottom3.set_ylabel("Image PC2")
 
         fig.subplots_adjust(wspace=0.9, hspace=0.5)
 
