@@ -1,4 +1,4 @@
-"""Create figure 3
+"""Plot figure 3 panels
 
 author: laquitainesteeve@gmail.com based on code from Carlo Paris & Matthew Chalk
 
@@ -8,8 +8,10 @@ Usage:
     conda activate envs/fisher_info_limits2
     python src/pipes/fig3.py
 
+Execution time: 2 min
+
 Returns:
-    _type_: _description_
+    _type_: .svg of RGC cells fig3 panels in ./figures/all/
 """
 import os
 import numpy as np
@@ -302,6 +304,7 @@ if __name__ == "__main__":
             print("Loaded precomputed data:", out.keys())
 
         # PLOT -------------------------------------------------------------------------------------------
+
         xylim = (-3,3)
         xyticks = (-3,0,3)
 
@@ -353,18 +356,13 @@ if __name__ == "__main__":
 
         ax_bottom = fig.add_subplot(gs_main[1], )
 
-        # plot contours
-        contour_levels = np.linspace(0, np.max(preds), 20)
-        # contour = ax_bottom.contour(grid_x, grid_y, preds.reshape(grid_x.shape), 
-        #                            levels=contour_levels, cmap='viridis', 
-        #                            vmin=-preds.min(), vmax=preds.max(), zorder=12)
-        # im = ax_bottom.imshow(preds.reshape(grid_x.shape))
+        # plot tuning curve as heatmap
         im = ax_bottom.contourf(grid_x, grid_y, preds.reshape(grid_x.shape), levels=50, cmap='viridis')
         divider = make_axes_locatable(ax_bottom) # colorbar
         cax = divider.append_axes("right", size="10%", pad=0.3)
         cbar = plt.colorbar(im, cax=cax, label="mean spike count")    
 
-        # plot prior
+        # plot prior as contours
         for n_std in np.arange(0, 6, 1):
             plot_gaussian_ellipse(np.array([mu0, mu1]), sigma, 
                                 ax_bottom, n_std=n_std, 
@@ -379,17 +377,18 @@ if __name__ == "__main__":
         ax_bottom.set_ylim(xylim)
         ax_bottom.set_xticks(xyticks,xyticks)
         ax_bottom.set_yticks(xyticks,xyticks)
-        # ax_bottom.legend(['Prior'], frameon=False, loc="upper right")
+
 
 
         # Third subplot: plot SSI ----------------------------------------------------
 
         # SSI 
         ax_bottom3 = fig.add_subplot(gs_main[2])
-        im = ax_bottom3.imshow(ssi)
-        # ax_bottom3.set_title("SSI")
-        ax_bottom3.set_xticks(np.arange(0,300,100), np.arange(0,300,100))
-        ax_bottom3.set_yticks(np.arange(0,300,100), np.arange(0,300,100))
+        im = ax_bottom3.contourf(out['grid_x'], out['grid_y'], ssi, levels=50, cmap='viridis')
+        ax_bottom3.set_xlim(xylim)
+        ax_bottom3.set_ylim(xylim)
+        ax_bottom3.set_xticks(xyticks,xyticks)
+        ax_bottom3.set_yticks(xyticks,xyticks)
         divider = make_axes_locatable(ax_bottom3) # colorbar
         cax = divider.append_axes("right", size="10%", pad=0.3)
         cbar = plt.colorbar(im, cax=cax, label='SSI')    
@@ -400,3 +399,4 @@ if __name__ == "__main__":
         fig.subplots_adjust(wspace=0.9, hspace=0.5)
 
         plt.savefig(f'figures/all/fig3_{cell_no}.jpeg', bbox_inches = 'tight', transparent=True, dpi=400)    
+    
