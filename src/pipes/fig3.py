@@ -1,6 +1,6 @@
 """Create figure 3
 
-author: Carlo Paris & laquitainesteeve@gmail.com 
+author: laquitainesteeve@gmail.com based on code from Carlo Paris & Matthew Chalk
 
 Usage:
     
@@ -309,7 +309,7 @@ if __name__ == "__main__":
         fig = plt.figure(figsize=(1.7,6))
 
         # create main GridSpec: 1 col, 2 rows
-        #height_ratios: size of each axis
+        # height_ratios: size of each axis
         gs_main = gridspec.GridSpec(3,1, figure=fig, wspace=0, height_ratios=[1.5,1,1]) 
 
         # Second subplot: Stimulus pcs & histogram --------------------------------------------------------------------------------
@@ -328,7 +328,7 @@ if __name__ == "__main__":
 
         # plot scatter points and histograms
         scatter_hist(pcs[0], pcs[1], axs['scatter'], axs['histx'], axs['histy'], c=(.7,0.7,0.7))
-        # axs['scatter'].set_aspect('equal')
+        axs['scatter'].set_aspect('equal')
         axs['scatter'].set_xlabel('Natural image PC1')
         axs['scatter'].set_ylabel('Natural image PC2')
         axs['scatter'].set_xlim(xylim)
@@ -355,9 +355,14 @@ if __name__ == "__main__":
 
         # plot contours
         contour_levels = np.linspace(0, np.max(preds), 20)
-        contour = ax_bottom.contour(grid_x, grid_y, preds.reshape(grid_x.shape), 
-                                levels=contour_levels, cmap='viridis', 
-                                vmin=-preds.min(), vmax=preds.max(), zorder=12)
+        # contour = ax_bottom.contour(grid_x, grid_y, preds.reshape(grid_x.shape), 
+        #                            levels=contour_levels, cmap='viridis', 
+        #                            vmin=-preds.min(), vmax=preds.max(), zorder=12)
+        # im = ax_bottom.imshow(preds.reshape(grid_x.shape))
+        im = ax_bottom.contourf(grid_x, grid_y, preds.reshape(grid_x.shape), levels=50, cmap='viridis')
+        divider = make_axes_locatable(ax_bottom) # colorbar
+        cax = divider.append_axes("right", size="10%", pad=0.3)
+        cbar = plt.colorbar(im, cax=cax, label="mean spike count")    
 
         # plot prior
         for n_std in np.arange(0, 6, 1):
@@ -365,12 +370,8 @@ if __name__ == "__main__":
                                 ax_bottom, n_std=n_std, 
                                 edgecolor='red', facecolor='None')
 
-        # add colorbar
-        plt.colorbar(contour, ax=ax_bottom, label="Fitted neural response")
-
         # aesthetics
-        # ax_bottom.set_aspect('equal')
-
+        ax_bottom.set_aspect('equal')
         ax_bottom.spines[['right']].set_visible(False)
         ax_bottom.set_xlabel("Natural image PC1")
         ax_bottom.set_ylabel("Natural image PC2")
@@ -378,8 +379,7 @@ if __name__ == "__main__":
         ax_bottom.set_ylim(xylim)
         ax_bottom.set_xticks(xyticks,xyticks)
         ax_bottom.set_yticks(xyticks,xyticks)
-        ax_bottom.legend(['Prior'], frameon=False, loc="upper right")
-
+        # ax_bottom.legend(['Prior'], frameon=False, loc="upper right")
 
 
         # Third subplot: plot SSI ----------------------------------------------------
@@ -387,16 +387,16 @@ if __name__ == "__main__":
         # SSI 
         ax_bottom3 = fig.add_subplot(gs_main[2])
         im = ax_bottom3.imshow(ssi)
-        ax_bottom3.set_title("SSI")
+        # ax_bottom3.set_title("SSI")
         ax_bottom3.set_xticks(np.arange(0,300,100), np.arange(0,300,100))
         ax_bottom3.set_yticks(np.arange(0,300,100), np.arange(0,300,100))
         divider = make_axes_locatable(ax_bottom3) # colorbar
         cax = divider.append_axes("right", size="10%", pad=0.3)
-        cbar = plt.colorbar(im, cax=cax)    
+        cbar = plt.colorbar(im, cax=cax, label='SSI')    
         ax_bottom3.set_xlabel("Natural image PC1")
         ax_bottom3.set_ylabel("Natural image PC2")
+        ax_bottom3.set_aspect('equal')
 
         fig.subplots_adjust(wspace=0.9, hspace=0.5)
 
-        # save figure
         plt.savefig(f'figures/all/fig3_{cell_no}.jpeg', bbox_inches = 'tight', transparent=True, dpi=400)    
