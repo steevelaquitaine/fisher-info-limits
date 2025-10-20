@@ -35,6 +35,40 @@ import matplotlib.gridspec as gridspec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import re
 
+# utils ---------------------------------------------
+
+def create_gaussian_mask(grid_x, grid_y, mu, sigma, n_std=3):
+    """
+    Create a mask for points outside n standard deviations of a 2D Gaussian.
+    
+    Parameters
+    ----------
+    grid_x, grid_y : array_like
+        Meshgrid coordinates
+    mu : array_like
+        Mean [mu_x, mu_y]
+    sigma : array_like
+        Covariance matrix (2x2)
+    n_std : float
+        Number of standard deviations
+    
+    Returns
+    -------
+    mask : array_like
+        Boolean mask (True = inside, False = outside)
+    """
+    # Flatten grid for computation
+    points = np.stack([grid_x.ravel(), grid_y.ravel()], axis=1)
+    
+    # Calculate Mahalanobis distance
+    diff = points - mu
+    inv_sigma = np.linalg.inv(sigma)
+    mahal_dist_sq = np.sum(diff @ inv_sigma * diff, axis=1)
+    
+    # Points inside n_std satisfy: mahal_dist^2 <= n_std^2
+    mask = mahal_dist_sq <= n_std**2
+    return mask.reshape(grid_x.shape)
+
 # 2D Poisson  -------------------------------------------
 
 def SUM_LOG_LIST(position):
@@ -308,18 +342,23 @@ if __name__ == "__main__":
         xylim = (-3,3)
         xyticks = (-3,0,3)
 
+        # Create mask for 3 standard deviations
+        mask_3std = create_gaussian_mask(out['grid_x'], out['grid_y'], np.array([mu0, mu1]), sigma, n_std=3)
+
+        # Apply mask to data
+        preds_masked = np.where(mask_3std, preds.reshape(out['grid_x'].shape), np.nan)
+        ssi_masked = np.where(mask_3std, ssi, np.nan)
+
         # setup plot
         fig = plt.figure(figsize=(1.7,6))
 
-        # create main GridSpec: 1 col, 2 rows
-        # height_ratios: size of each axis
-        gs_main = gridspec.GridSpec(3,1, figure=fig, wspace=0, height_ratios=[1.5,1,1]) 
+        # create main GridSpec: 1 col, 3 rows
+        gs_main = gridspec.GridSpec(3,1, figure=fig, wspace=0, height_ratios=[1.5,1,1])
 
-        # Second subplot: Stimulus pcs & histogram --------------------------------------------------------------------------------
-
-        gs_top =  gridspec.GridSpecFromSubplotSpec(2, 2, 
+        # First subplot: Stimulus pcs & histogram --------------------------------------------------------------------------------
+        gs_top = gridspec.GridSpecFromSubplotSpec(2, 2,
                                                 subplot_spec=gs_main[0],
-                                                width_ratios=[4, 1], 
+                                                width_ratios=[4, 1],
                                                 height_ratios=[1, 4],
                                                 hspace=0.5, wspace=0.2)
 
@@ -341,8 +380,8 @@ if __name__ == "__main__":
 
         # plot prior (contours)
         for n_std in np.arange(0, 5, 1):
-            plot_gaussian_ellipse(np.array([mu0, mu1]), sigma, 
-                                axs['scatter'], n_std=n_std, 
+            plot_gaussian_ellipse(np.array([mu0, mu1]), sigma,
+                                axs['scatter'], n_std=n_std,
                                 edgecolor='red', facecolor='None')
 
         # aesthetics
@@ -353,22 +392,23 @@ if __name__ == "__main__":
         axs['histy'].set_xlabel('Count')
 
         # Second subplot: Tuning curve and prior --------------------------------------------------------------------------------
+        ax_bottom = fig.add_subplot(gs_main[1])
 
-        ax_bottom = fig.add_subplot(gs_main[1], )
+        # plot tuning curve as heatmap (MASKED - white outside 3 std)
+        im = ax_bottom.contourf(grid_x, grid_y, preds_masked, levels=50, cmap='viridis', extend='neither')
+        ax_bottom.set_facecolor('white')  # Set background to white for masked regions
 
-        # plot tuning curve as heatmap
-        im = ax_bottom.contourf(grid_x, grid_y, preds.reshape(grid_x.shape), levels=50, cmap='viridis')
-        divider = make_axes_locatable(ax_bottom) # colorbar
+        divider = make_axes_locatable(ax_bottom)
         cax = divider.append_axes("right", size="10%", pad=0.3)
-        cbar = plt.colorbar(im, cax=cax, label="mean spike count")    
+        cbar = plt.colorbar(im, cax=cax, label="mean spike count")
 
         # plot prior as contours
         for n_std in np.arange(0, 6, 1):
-            plot_gaussian_ellipse(np.array([mu0, mu1]), sigma, 
-                                ax_bottom, n_std=n_std, 
+            plot_gaussian_ellipse(np.array([mu0, mu1]), sigma,
+                                ax_bottom, n_std=n_std,
                                 edgecolor='red', facecolor='None')
 
-        # aesthetics
+        # formatting
         ax_bottom.set_aspect('equal')
         ax_bottom.spines[['right']].set_visible(False)
         ax_bottom.set_xlabel("Natural image PC1")
@@ -377,24 +417,32 @@ if __name__ == "__main__":
         ax_bottom.set_ylim(xylim)
         ax_bottom.set_xticks(xyticks,xyticks)
         ax_bottom.set_yticks(xyticks,xyticks)
+        ax_bottom.spines[['top','right']].set_visible(False)
 
-
-
-        # Third subplot: plot SSI ----------------------------------------------------
-
-        # SSI 
+        # Third subplot: plot SSI (MASKED - white outside 3 std) ----------------------------------------------------
         ax_bottom3 = fig.add_subplot(gs_main[2])
-        im = ax_bottom3.contourf(out['grid_x'], out['grid_y'], ssi, levels=50, cmap='viridis')
+        im = ax_bottom3.contourf(out['grid_x'], out['grid_y'], ssi_masked, levels=50, cmap='viridis', extend='neither')
+        ax_bottom3.set_facecolor('white')  # Set background to white for masked regions
+
         ax_bottom3.set_xlim(xylim)
         ax_bottom3.set_ylim(xylim)
         ax_bottom3.set_xticks(xyticks,xyticks)
         ax_bottom3.set_yticks(xyticks,xyticks)
-        divider = make_axes_locatable(ax_bottom3) # colorbar
+
+        divider = make_axes_locatable(ax_bottom3)
         cax = divider.append_axes("right", size="10%", pad=0.3)
-        cbar = plt.colorbar(im, cax=cax, label='SSI')    
+        cbar = plt.colorbar(im, cax=cax, label='SSI')
+
+        # plot prior as contours
+        for n_std in np.arange(0, 6, 1):
+            plot_gaussian_ellipse(np.array([mu0, mu1]), sigma,
+                                ax_bottom3, n_std=n_std,
+                                edgecolor='red', facecolor='None')
+
         ax_bottom3.set_xlabel("Natural image PC1")
         ax_bottom3.set_ylabel("Natural image PC2")
         ax_bottom3.set_aspect('equal')
+        ax_bottom3.spines[['top','right']].set_visible(False)
 
         fig.subplots_adjust(wspace=0.9, hspace=0.5)
 
