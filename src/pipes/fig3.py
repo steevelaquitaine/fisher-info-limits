@@ -444,7 +444,13 @@ if __name__ == "__main__":
         ax_bottom3.set_aspect('equal')
         ax_bottom3.spines[['top','right']].set_visible(False)
 
+        # save tuning curves
+        from scipy.io import savemat
+        savemat(f'data/fitted_tunings/cell_{cell_no}.mat', {'firingrate': preds})
+
         fig.subplots_adjust(wspace=0.9, hspace=0.5)
 
         plt.savefig(f'figures/all/fig3_{cell_no}.jpeg', bbox_inches = 'tight', transparent=True, dpi=400)    
     
+    # save common grid input
+    savemat(f'data/fitted_tunings/grid_input.mat', {'grid_input': grid_input})
