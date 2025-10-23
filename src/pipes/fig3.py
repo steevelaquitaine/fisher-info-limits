@@ -1,4 +1,4 @@
-"""Plot figure 3 panels
+"""Plot a figure 3 panel for each RGC cell contained in data/contrast_cells/
 
 author: laquitainesteeve@gmail.com based on code from Carlo Paris & Matthew Chalk
 
@@ -6,42 +6,51 @@ Usage:
     
     # setup conda environment, activate and run pipeline
     conda activate envs/fisher_info_limits2
-    python src/pipes/fig3.py
+    nohup python src/pipes/fig3.py
 
-Execution time: 2 min
+Execution time: 3 min per cell on CPU
+
+Tested on an Ubuntu 24.04.1 LTS (32 cores, 188 GB RAM, Intel(R) Core(TM) i9-14900K @3.2 GHz/5.8 GHz)
 
 Returns:
-    _type_: .svg of RGC cells fig3 panels in ./figures/all/
+    .svg: figures of RGC cells fig3 panels in ./figures/all/
 """
-import os
-import numpy as np
-import math
+# import packages
+import os 
+import sys
+from matplotlib import pyplot as plt;
 import scipy.io as sio
-import matplotlib.pyplot as  plt
-import matplotlib.gridspec as gridspec
-from matplotlib.patches import Ellipse
-from scipy.stats import wilcoxon, ks_2samp, multivariate_normal
-from scipy.interpolate import griddata
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import r2_score
-from scipy.stats import pearsonr, spearmanr
-from numba import njit, prange
-from scipy.stats import pearsonr
+import numpy as np
+from numpy import log
+import math
 import matplotlib.gridspec as gridspec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import re
+import argparse
+import torch.nn as nn
 
 # set project path
 proj_path = '/home/steeve/steeve/idv/code/fisher-info-limits'
 os.chdir(proj_path)
 
-# pipeline parameters
-LOAD_METRICS = True
-GRID_POS = 220
+# add custom package to path
+sys.path.append('.')
+
+# import custom package
+from src import nodes
+
+# setup ilocal parmaeters
+SEED = 10
+ngamma = 20     # default=100;
+gamma0 = 0.01
+gamma_max = 200
+eta = 1e-4
+ny = 101         # discretisation of y = x + sqrt(gamma)*noise. Adapt depending on gamma and tuning curve discretization.
+AMP = 20         # max possible spike count
+
+# setup cell data path
+CELL_DATA_PATH = 'data/contrast_cells/carlo_data_cellno3.mat'       # cell responses and image principal components
+METRICS_DATA_PATH = 'data/computed_contrast_cells/BDEvSSI_no3.npz'  # precomputed information metrics
 
 # setup figure paraleters
 plt.rcParams["font.family"] = "Arial"
@@ -247,117 +256,102 @@ def plot_gaussian_ellipse(mean, cov, ax, n_std=1.0, **kwargs):
 if __name__ == "__main__":
     """Entry point
     """
-
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Compute psds")
+    parser.add_argument("--recording-path", default= './dataset/00_raw/recording_dense_probe1', help="recording path.")
+    
+    args = parser.parse_args()
+    
     # loop over the cells contained in the data path
     for i, input_filename in enumerate(os.listdir(CELLS_PATH)):
 
+        # check that the file is a matlab .mat file
         if '.mat' not in input_filename:
             continue
 
         # print the name of the cell data file
         print(input_filename)                
 
-        # ensure it contains cell number "no"
+        # ensure it contains the cell number "no" tag
         match = re.search(r"no\d+", input_filename)
         cell_no = match.group()
 
-        # setup precomputed data file to load 
+        # setup the precomputed data file to load 
         precomputed_filename = f'BDEvSSI_{cell_no}.npz'        
         print(precomputed_filename)
         print('\n')
 
-        # load one cell data
+        # load the data for that cell
         mat = sio.loadmat(os.path.join(CELLS_PATH, input_filename))
-        np.random.seed(10)
+        np.random.seed(SEED)
 
         # get tuning curve data
         pcs = mat['X_lowd'] # principal components
         fit = mat['f']      # average firing rate (tuning)
 
-        # setup mean and covariance of the prior -----------------------------------
+        # prior --------------------------------------------------
 
+        # - zero mean and data-driven covariance
         mu0 = pcs[0].mean()
         mu1 = pcs[1].mean()
         sigma = np.cov(pcs[0], pcs[1])
 
-        # fit the cell's tuning curve with a neural network -------------------------------
+        # tuning curve model --------------------------------------------------
 
-        # we can get continuous predictions of average responses for arbitrary PC1 and 2 pairs
-        print("Fitting neural net to tuning curve data...")
-        preds, model, _, grid_x, grid_y, grid_input_scaled, grid_input = nnet_fit(pcs, fit)
-        with torch.no_grad():
-            preds = model(torch.tensor(grid_input_scaled, dtype=torch.float32)).numpy()
-
-
-        # compute/load neural information metrics  ------------------------
-
-        # set parameters
         baseline = 1e-2
 
-        # calculate prior
-        mus = pcs[:2].mean(axis=1)
-        prior = multivariate_normal(mus, sigma)
-        grid_prior = prior.pdf(grid_input).reshape(grid_x.shape)/prior.pdf(grid_input).reshape(grid_x.shape).sum()
-        prior_entropy = -np.sum(grid_prior*np.around(np.log2(grid_prior), 8))
+        # get neuron's 2-D tuning curve
+        # - train a neural net to predict RGCs responses in natural image 2-D latent space (space of (PC1,PC2) values)
+        _, tuning_curve_model, _, grid_x, grid_y, latent_space_scaled, latent_space = nodes.nnet_fit(pcs[:2], fit, linspace=np.linspace(-10,10,100))
 
-        # calculate likelihood
-        with torch.no_grad():
-            preds = model(torch.tensor(grid_input, dtype=torch.float32)).numpy()[:,0]
-        tc = preds.reshape(grid_x.shape)+baseline
-        likelihood = POISSON_2DCELL(tc)
+        # - predict neural responses in the image 2-D latent space (2-D tuning curve)
+        rate_preds = nodes.tuning_curve_nnet(latent_space, tuning_curve_model)
+        tuning_curve = rate_preds.reshape(grid_x.shape) + baseline
 
-        # calculate posterior
-        evidence = np.sum(likelihood*np.tile(grid_prior[None,:,:], (likelihood.shape[0],1,1)), axis=(-1,-2))
-        posterior = likelihood*np.tile(grid_prior[None,:,:], (likelihood.shape[0],1,1))/\
-                                np.tile(evidence[:,None,None], (1,*likelihood.shape[1:])) 
-        posterior[posterior==0] = 1e-50
-        posterior = posterior/np.tile(posterior.sum(axis=(1,2))[:,None,None], (1, *grid_x.shape))
+        # 2D latent space -------------------------------------------------------------
 
-        # computing is slow for 300 x 300 grid (> 1 hour)
-        if not LOAD_METRICS:
+        # x points to plot, from -xmax to xmax
+        nx = grid_x.shape[0]
+        xmax = latent_space.max()              # 10 - OK! = 10 for grid linspace on -10 to 10 with 100 steps
+        x = np.linspace(-xmax, xmax, nx)[None] # of shape (1,100)
+        dx = x[0,1] - x[0,0]                   # note: dx is 10 X smaller than in replication - OK! = 0.202
 
-            # compute SSI
-            post_entropy = -np.sum(posterior*np.around(np.log2(posterior),8), axis=(1,2))
-            ssi = prior_entropy - np.sum(likelihood * np.tile(post_entropy[:,None,None], (1, *grid_x.shape)) ,axis=0)
+        # create neuron 2D tuning curve f(PC1,PC2) 
+        firingrate = rate_preds.reshape(nx,nx)
 
-            # compute Bayes error
-            mse = np.empty_like(posterior[0])
-            for i in range(likelihood.shape[1]):
-                for j in range(likelihood.shape[2]):
-                    post_ij = np.sum(posterior * np.tile(likelihood[:,i,j][:,None,None], (1, *likelihood.shape[1:])), axis=0)
-                    delta = (grid_x - grid_x[i,j])**2+(grid_y-grid_y[i,j])**2
-                    mse[i,j] = np.sum(post_ij*delta)
-            rmse = np.sqrt(mse)
-            print("Computed SSI and Bayes error.")
+        # SSI   -------------------------------------------------------------
 
-        else: 
-            # load precomputed metrics
-            out = np.load(os.path.join(DATA_PATH, precomputed_filename))
+        # compute/load neural information metrics 
+        # ssi, ssi_bound, mse, rmse = compute_ssi_and_bayes_mse_via_method1(pcs, grid_x, grid_y, tuning_c, sigma, latent_space, load=True, metrics_data_path=METRICS_DATA_PATH)
+        ssi, Inf_ssi, logpx, logpr_x, logpr = nodes.compute_ssi(latent_space, firingrate, dx, amp=AMP, Sigmax=sigma)
 
-            # out = np.load(METRICS_DATA_PATH)
-            ssi = out['ssi']
-            print("grid shape: ", out['grid_x'].shape)
-            print("Loaded precomputed data:", out.keys())
+        # iLocal   -------------------------------------------------------------
+        
+        Ilocal, Inf, gamma = nodes.compute_ilocal(latent_space, tuning_curve_model, nx, dx, ny, ngamma, gamma0, gamma_max, eta, AMP, sigma)
 
-        # PLOT -------------------------------------------------------------------------------------------
+        # Plot -------------------------------------------------------------
 
+        # setup parameters
         xylim = (-3,3)
         xyticks = (-3,0,3)
 
-        # Create mask for 3 standard deviations
-        mask_3std = create_gaussian_mask(out['grid_x'], out['grid_y'], np.array([mu0, mu1]), sigma, n_std=3)
+        # create mask to display data only within 3 standard deviations
+        # beyond that we don't have enough data to estimate the tuning curve reliably
+        mask_3std = nodes.create_gaussian_mask(grid_x, grid_y, np.array([mu0, mu1]), sigma, n_std=3)
 
-        # Apply mask to data
-        preds_masked = np.where(mask_3std, preds.reshape(out['grid_x'].shape), np.nan)
+        # apply mask to data
+        preds_masked = np.where(mask_3std, rate_preds.reshape(grid_x.shape), np.nan)
         ssi_masked = np.where(mask_3std, ssi, np.nan)
+        Ilocal_masked = np.where(mask_3std, Ilocal, np.nan)
 
         # setup plot
-        fig = plt.figure(figsize=(1.7,6))
+        fig = plt.figure(figsize=(1.7,8))
 
         # create main GridSpec: 1 col, 3 rows
-        gs_main = gridspec.GridSpec(3,1, figure=fig, wspace=0, height_ratios=[1.5,1,1])
+        gs_main = gridspec.GridSpec(4,1, figure=fig, wspace=0, height_ratios=[1.5,1,1,1])
 
         # First subplot: Stimulus pcs & histogram --------------------------------------------------------------------------------
+        
         gs_top = gridspec.GridSpecFromSubplotSpec(2, 2,
                                                 subplot_spec=gs_main[0],
                                                 width_ratios=[4, 1],
@@ -371,7 +365,7 @@ if __name__ == "__main__":
         axs['histy'] = fig.add_subplot(gs_top[1, 1])
 
         # plot scatter points and histograms
-        scatter_hist(pcs[0], pcs[1], axs['scatter'], axs['histx'], axs['histy'], c=(.7,0.7,0.7))
+        nodes.scatter_hist(pcs[0], pcs[1], axs['scatter'], axs['histx'], axs['histy'], c=(.7,0.7,0.7))
         axs['scatter'].set_aspect('equal')
         axs['scatter'].set_xlabel('Natural image PC1')
         axs['scatter'].set_ylabel('Natural image PC2')
@@ -382,7 +376,7 @@ if __name__ == "__main__":
 
         # plot prior (contours)
         for n_std in np.arange(0, 5, 1):
-            plot_gaussian_ellipse(np.array([mu0, mu1]), sigma,
+            nodes.plot_gaussian_ellipse(np.array([mu0, mu1]), sigma,
                                 axs['scatter'], n_std=n_std,
                                 edgecolor='red', facecolor='None')
 
@@ -394,19 +388,20 @@ if __name__ == "__main__":
         axs['histy'].set_xlabel('Count')
 
         # Second subplot: Tuning curve and prior --------------------------------------------------------------------------------
+
         ax_bottom = fig.add_subplot(gs_main[1])
 
         # plot tuning curve as heatmap (MASKED - white outside 3 std)
         im = ax_bottom.contourf(grid_x, grid_y, preds_masked, levels=50, cmap='viridis', extend='neither')
         ax_bottom.set_facecolor('white')  # Set background to white for masked regions
-
+        # colorbar
         divider = make_axes_locatable(ax_bottom)
         cax = divider.append_axes("right", size="10%", pad=0.3)
         cbar = plt.colorbar(im, cax=cax, label="mean spike count")
 
         # plot prior as contours
         for n_std in np.arange(0, 6, 1):
-            plot_gaussian_ellipse(np.array([mu0, mu1]), sigma,
+            nodes.plot_gaussian_ellipse(np.array([mu0, mu1]), sigma,
                                 ax_bottom, n_std=n_std,
                                 edgecolor='red', facecolor='None')
 
@@ -423,36 +418,62 @@ if __name__ == "__main__":
 
         # Third subplot: plot SSI (MASKED - white outside 3 std) ----------------------------------------------------
         ax_bottom3 = fig.add_subplot(gs_main[2])
-        im = ax_bottom3.contourf(out['grid_x'], out['grid_y'], ssi_masked, levels=50, cmap='viridis', extend='neither')
-        ax_bottom3.set_facecolor('white')  # Set background to white for masked regions
+        im = ax_bottom3.contourf(grid_x, grid_y, ssi_masked/log(2), levels=50, cmap='viridis', extend='neither')
 
+        # formatting
+        ax_bottom3.set_facecolor('white')  # Set background to white for masked regions
         ax_bottom3.set_xlim(xylim)
         ax_bottom3.set_ylim(xylim)
         ax_bottom3.set_xticks(xyticks,xyticks)
         ax_bottom3.set_yticks(xyticks,xyticks)
-
+        # colorbar
         divider = make_axes_locatable(ax_bottom3)
         cax = divider.append_axes("right", size="10%", pad=0.3)
-        cbar = plt.colorbar(im, cax=cax, label='SSI')
+        cbar = plt.colorbar(im, cax=cax, label='SSI (bits)')
 
         # plot prior as contours
         for n_std in np.arange(0, 6, 1):
-            plot_gaussian_ellipse(np.array([mu0, mu1]), sigma,
+            nodes.plot_gaussian_ellipse(np.array([mu0, mu1]), sigma,
                                 ax_bottom3, n_std=n_std,
                                 edgecolor='red', facecolor='None')
-
+        # formatting
         ax_bottom3.set_xlabel("Natural image PC1")
         ax_bottom3.set_ylabel("Natural image PC2")
         ax_bottom3.set_aspect('equal')
         ax_bottom3.spines[['top','right']].set_visible(False)
 
-        # save tuning curves
-        from scipy.io import savemat
-        savemat(f'data/fitted_tunings/cell_{cell_no}.mat', {'firingrate': preds})
 
+
+        # Fourth subplot: plot Ilocal (MASKED - white outside 3 std) ----------------------------------------------------
+        ax_bottom3 = fig.add_subplot(gs_main[3])
+        im = ax_bottom3.contourf(grid_x, grid_y, Ilocal_masked / log(2), levels=50, cmap='viridis', extend='neither')
+
+        # formatting
+        ax_bottom3.set_facecolor('white')  # Set background to white for masked regions
+        ax_bottom3.set_xlim(xylim)
+        ax_bottom3.set_ylim(xylim)
+        ax_bottom3.set_xticks(xyticks,xyticks)
+        ax_bottom3.set_yticks(xyticks,xyticks)
+        # colorbar
+        divider = make_axes_locatable(ax_bottom3)
+        cax = divider.append_axes("right", size="10%", pad=0.3)
+        cbar = plt.colorbar(im, cax=cax, label='$I_{local}$ (bits)')
+
+        # plot prior as contours
+        for n_std in np.arange(0, 6, 1):
+            nodes.plot_gaussian_ellipse(np.array([mu0, mu1]), sigma,
+                                ax_bottom3, n_std=n_std,
+                                edgecolor='red', facecolor='None')
+        # formatting
+        ax_bottom3.set_xlabel("Natural image PC1")
+        ax_bottom3.set_ylabel("Natural image PC2")
+        ax_bottom3.set_aspect('equal')
+        ax_bottom3.spines[['top','right']].set_visible(False)
+
+        # format figure
         fig.subplots_adjust(wspace=0.9, hspace=0.5)
 
+        # save figure
         plt.savefig(f'figures/all/fig3_{cell_no}.jpeg', bbox_inches = 'tight', transparent=True, dpi=400)    
     
-    # save common grid input
-    savemat(f'data/fitted_tunings/grid_input.mat', {'grid_input': grid_input})
+
