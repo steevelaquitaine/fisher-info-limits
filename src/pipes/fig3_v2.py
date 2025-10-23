@@ -35,35 +35,6 @@ import matplotlib.gridspec as gridspec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import re
 
-# set project path
-proj_path = '/home/steeve/steeve/idv/code/fisher-info-limits'
-os.chdir(proj_path)
-
-# pipeline parameters
-LOAD_METRICS = True
-GRID_POS = 220
-
-# setup figure paraleters
-plt.rcParams["font.family"] = "Arial"
-plt.rcParams["font.size"] = 8
-plt.rcParams["lines.linewidth"] = 0.5
-plt.rcParams["axes.linewidth"] = 0.5
-plt.rcParams["axes.spines.top"] = False
-plt.rcParams["xtick.major.width"] = 0.5 
-plt.rcParams["xtick.minor.width"] = 0.5 
-plt.rcParams["ytick.major.width"] = 0.5 
-plt.rcParams["ytick.minor.width"] = 0.5
-plt.rcParams["xtick.major.size"] = 3.5 * 1.1
-plt.rcParams["xtick.minor.size"] = 2 * 1.1
-plt.rcParams["ytick.major.size"] = 3.5 * 1.1
-plt.rcParams["ytick.minor.size"] = 2 * 1.1
-
-# setup paths
-CELLS_PATH = os.path.join(proj_path, 'data/contrast_cells/') # path containing cells .mat files (e.g., carlo_data_cellno2.mat? (205 MB))
-DATA_PATH = os.path.join(proj_path, 'data/computed_contrast_cells/') # path containing cells .mat files (e.g., carlo_data_cellno2.mat? (205 MB))
-
-
-
 # utils ---------------------------------------------
 
 def create_gaussian_mask(grid_x, grid_y, mu, sigma, n_std=3):
@@ -247,6 +218,33 @@ def plot_gaussian_ellipse(mean, cov, ax, n_std=1.0, **kwargs):
 if __name__ == "__main__":
     """Entry point
     """
+
+    # set project path
+    proj_path = '/home/steeve/steeve/idv/code/fisher-info-limits'
+    os.chdir(proj_path)
+
+    # pipeline parameters
+    LOAD_METRICS = True
+    GRID_POS = 220
+
+    # setup figure paraleters
+    plt.rcParams["font.family"] = "Arial"
+    plt.rcParams["font.size"] = 8
+    plt.rcParams["lines.linewidth"] = 0.5
+    plt.rcParams["axes.linewidth"] = 0.5
+    plt.rcParams["axes.spines.top"] = False
+    plt.rcParams["xtick.major.width"] = 0.5 
+    plt.rcParams["xtick.minor.width"] = 0.5 
+    plt.rcParams["ytick.major.width"] = 0.5 
+    plt.rcParams["ytick.minor.width"] = 0.5
+    plt.rcParams["xtick.major.size"] = 3.5 * 1.1
+    plt.rcParams["xtick.minor.size"] = 2 * 1.1
+    plt.rcParams["ytick.major.size"] = 3.5 * 1.1
+    plt.rcParams["ytick.minor.size"] = 2 * 1.1
+
+    # setup paths
+    CELLS_PATH = os.path.join(proj_path, 'data/contrast_cells/') # path containing cells .mat files (e.g., carlo_data_cellno2.mat? (205 MB))
+    DATA_PATH = os.path.join(proj_path, 'data/computed_contrast_cells/') # path containing cells .mat files (e.g., carlo_data_cellno2.mat? (205 MB))
 
     # loop over the cells contained in the data path
     for i, input_filename in enumerate(os.listdir(CELLS_PATH)):
