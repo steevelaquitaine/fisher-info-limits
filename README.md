@@ -11,12 +11,17 @@ Execution time:
 
 # Description 
 
-Data from 41 Retina Ganglion Cells:
+The dataset includes the firing rates of 41 Retina Ganglion Cells evoked by natural images (Golding et al., 2022):
 
-* Data/contrast_cells/ contains receptive field data (709M)
-* Data/computed_contrast_cells/ contains computed Bayes error and SSI.
+```bash
+* data/                         # (10 GB)
+    * contrast_cells/           # (8.3GB) contains RGCs firing rate displayed natural image PCs
+    * computed_contrast_cells/  # (709 MB) contains computed Bayes error and SSI
+    * DS_cells.pkl              # (246 MB) data for quads of direction selective RGCs
+    * bayesian_decoding_error/  # (916K) precomputed Bayes decoding error for quads of direction selective RGCs; uniform prior
+    * decoding_analysis/        # (256 MB) parameters of the quads of RGCs tuning curves
+```
 
-
-# How-to
+# Instructions
 
 - Run notebooks in notebook/
