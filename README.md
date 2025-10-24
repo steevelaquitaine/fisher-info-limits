@@ -6,7 +6,7 @@ Code for the paper on the limitations of the Fisher information metric
 
 Tested on Ubuntu 24.04.1 LTS (32 cores, 188 GB RAM, Intel(R) Core(TM) i9-14900K ＠3.2 GHz/5.8 GHz)
 
-Execution time:
+Execution time: ~2 hours
 
 
 # Description 
