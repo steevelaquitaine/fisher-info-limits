@@ -155,7 +155,7 @@ class SimpleRegressor(nn.Module):
             nn.Linear(64, 1)
         )
 
-    def forward(self, x):
+    def forward(self, x):   
         return self.model(x)
     
 
@@ -288,10 +288,10 @@ def tuning_curve_mog(x, model=None, mu=np.array([0.3, -1.2]),
 
 def get_tuning_curve_grad(X, tuning_curve_fun, model=None, eta=1e-4):
     """compute the gradient of the tuning curve
-    via numerical method
+    with finite difference approximation
 
     Args:
-        X (_type_): _description_
+        X (_type_): latent space points
         tuning_curve_fun (_type_): tuning curve function
         eta (_type_, optional): _description_. Defaults to 1e-4.
 
@@ -455,7 +455,7 @@ def compute_ssi(latent_space, firingrate, amp=20, Sigmax=np.array([[1,0.25], [0.
     return ssi, Inf_ssi, logpx, logpr_x, logpr
 
 
-def compute_ilocal(latent_space: np.array,  tuning_curve_model:SimpleRegressor, 
+def compute_ilocal(latent_space: np.array,  tuning_curve_model: SimpleRegressor, 
                    sigma=np.array([[1.,-0.07466075],[-0.07466075,1.]]),
                    ny=101, ngamma=20,
                    gamma0=0.01, gamma_max=200, eta=1e-4, amp=20):
@@ -464,29 +464,30 @@ def compute_ilocal(latent_space: np.array,  tuning_curve_model:SimpleRegressor,
     pc_values = np.unique(latent_space)
     dx = pc_values[1] - pc_values[0] # step size
 
-    # number of points along each dimension
+    # number of points along each image latent dimension
     num_x = np.sqrt(latent_space.shape[0]).astype(int)
 
     # get latent space parameters
     xmax = latent_space.max()
 
+    # Use Fisher information for low gamma values
     # Ilocal0 =  int J_gamma(y) dgamma, from gamma_0 to gamma
     Ilocal0 = zeros((num_x**2, 1))
 
-    # get firing rate predictions
+    # predict firing rates at image latent space points (2D tuning curve)
     rate_preds = tuning_curve_nnet(latent_space, tuning_curve_model)
 
     # compute the gradient of the tuning curve
     # df = get_tuning_curve_grad(latent_space, tuning_curve_mog, eta=1e-4)                     # for toy MOG model
     df = get_tuning_curve_grad(latent_space, tuning_curve_nnet, tuning_curve_model, eta=1e-4)  # for fitted RGC responses
 
-    # loop over x
+    # Use Fisher information for low gamma values
     for i in range(num_x**2):
-        J = df[:,i][:,None] * df[:,i][:,None].T / rate_preds[i] # fisher
+        J = df[:,i][:,None] * df[:,i][:,None].T / rate_preds[i] # Fisher
         Ilocal0[i] = 0.5 * slogdet(eye(2) + J * gamma0 * sigma / (gamma0*eye(2)+sigma))[1]   #Ilocal0
     Ilocal0 = Ilocal0.reshape(num_x,num_x).T
 
-    # set the number of gamma to loop through
+    # set the number of gamma noise scales to loop through
     gamma = exp(linspace(log(gamma0), log(gamma_max), ngamma))
 
     # Jx = <J_gamma(y)>_p(y|x)
@@ -495,66 +496,65 @@ def compute_ilocal(latent_space: np.array,  tuning_curve_model:SimpleRegressor,
     # initialize ilocal
     Inf = zeros((ngamma, ngamma))
 
-    # loop over noise scales
+    # Integrate I_local over noise scales
     for igamma in tqdm(range(len(gamma)), 'Computing ilocal'):
         
-        # discretisation of y = x+ sqrt(gamma)*noise. Adapt depending on gamma
-        ymax = xmax + 5 * sqrt(gamma[igamma]) # ok
-        y = linspace(-ymax, ymax, ny) # ok
-        dy = y[1] - y[0] # ok
+        # setup noisy stimulus latent space adapted depending on gamma
+        # discretisation of y = x + sqrt(gamma) * noise
+        ymax = xmax + 5 * sqrt(gamma[igamma])
+        y = linspace(-ymax, ymax, ny)
+        dy = y[1] - y[0]
+        [ycord1, ycord2] = meshgrid(y, y)
+        Y = np.hstack([vec(ycord1), vec(ycord2)])
         
-        [ycord1, ycord2] = meshgrid(y, y)  # ok
-        Y = np.hstack([vec(ycord1), vec(ycord2)]) # ok
-        
-        ## firing rate in this new space
-        # firingrate = f(Y).reshape(ny, ny).T # Ok!
-        rate_preds = tuning_curve_nnet(Y, tuning_curve_model).reshape(ny,ny)     # Ok!
+        # neural responses in this new space
+        rate_preds = tuning_curve_nnet(Y, tuning_curve_model).reshape(ny,ny)
 
         # log p(x) in this new coordinate space
-        logpx = -0.5 * sum(Y.T * solve(sigma, Y.T)).reshape(ny,ny).T - 0.5 * slogdet(2*pi*sigma)[1] # OK!
+        logpx = -0.5 * sum(Y.T * solve(sigma, Y.T)).reshape(ny,ny).T - 0.5 * slogdet(2*pi*sigma)[1]
 
         # p(y|x=0), gaussian filter for convolution
-        phi = exp(-0.5*(ycord1**2 + ycord2**2)/gamma[igamma]) / (2*pi*gamma[igamma]) # Ok!
+        phi = exp(-0.5*(ycord1**2 + ycord2**2)/gamma[igamma]) / (2*pi*gamma[igamma])
 
         # p(y|x=eta) same as above, but increment x, for numerical derivative
-        phi1 = exp(-0.5*((ycord1+eta)**2+ycord2**2)/gamma[igamma]) / (2*pi*gamma[igamma]) # Ok!
-        phi2 = exp(-0.5*(ycord1**2+(ycord2+eta)**2)/gamma[igamma]) / (2*pi*gamma[igamma]) # Ok!
+        phi1 = exp(-0.5*((ycord1+eta)**2+ycord2**2)/gamma[igamma]) / (2*pi*gamma[igamma])
+        phi2 = exp(-0.5*(ycord1**2+(ycord2+eta)**2)/gamma[igamma]) / (2*pi*gamma[igamma])
 
         # convolve p(x) with phi to get p(y)
-        logpy = log( convolve2d(exp(logpx), phi, 'same')*(dy**2)) # Ok!
+        logpy = log( convolve2d(exp(logpx), phi, 'same')*(dy**2))
 
         # same thing, but with incremented x, for numerical derivative
-        logpy1 = log( convolve2d(exp(logpx), phi1, 'same')*(dy**2)) # Ok!
-        logpy2 = log( convolve2d(exp(logpx), phi2, 'same')*(dy**2)) # Ok!
+        logpy1 = log( convolve2d(exp(logpx), phi1, 'same')*(dy**2))
+        logpy2 = log( convolve2d(exp(logpx), phi2, 'same')*(dy**2))
 
         # J_R(y)
         Jry = zeros((ny, ny))
         
-        # loop over spike counts
-        for r in range(int(amp+ceil(sqrt(amp*5))+1)): 
+        # loop over mean spike counts
+        for r in range(int(amp + ceil(sqrt(amp*5)) + 1)): 
 
-            # log p(r|x)
-            logpr_x = log(rate_preds)*r - rate_preds - gammaln(r+1)  # OK
+            # log p(r|x) - the log likelihood
+            logpr_x = log(rate_preds)*r - rate_preds - gammaln(r+1)
 
             # p(r,x)
-            prx = exp(logpr_x + logpx) # Ok!
+            prx = exp(logpr_x + logpx)
 
             # convolve p(r,x) with phi(x) to get log p(r,y), then subtract
             # logp(y) to get log p(r|y)
-            logpr_y = log( convolve2d(prx, phi, 'same')*(dy**2)) - logpy # Ok!
+            logpr_y = log( convolve2d(prx, phi, 'same')*(dy**2)) - logpy
 
             # same as above but with incremented x, for numerical derivative
-            logpr_y1 = log( convolve2d(prx, phi1, 'same')*(dy**2)) - logpy1 # Ok!
-            logpr_y2 = log( convolve2d(prx, phi2, 'same')*(dy**2)) - logpy2 # Ok!
+            logpr_y1 = log( convolve2d(prx, phi1, 'same')*(dy**2)) - logpy1
+            logpr_y2 = log( convolve2d(prx, phi2, 'same')*(dy**2)) - logpy2
 
             # Jry = <(d logpr_y/dy)^2>_{p(r|y)} - sum over p(r|y)
-            Jry = Jry + exp(logpr_y) * ((logpr_y2 - logpr_y)**2 + (logpr_y1 - logpr_y)**2)/(eta**2) # Ok!
+            Jry = Jry + exp(logpr_y) * ((logpr_y2 - logpr_y)**2 + (logpr_y1 - logpr_y)**2)/(eta**2)
 
         # p(y|x) - to go back to space of 'latent_space' of shape (num_x**2, 10201)
         py_x = exp(-0.5*(sum2(latent_space**2) - 2*latent_space @ Y.T + sum2(Y**2).T)/gamma[igamma])/(2*pi*gamma[igamma]) # Ok!
 
         # meanJry_gamma(x) = <J_gamma(y)>_p(y|x) of shape (num_x**2, len(gamma))
-        meanJry[:, igamma] = (py_x @ vec(Jry) * (dy**2)).flatten() # Ok!
+        meanJry[:, igamma] = (py_x @ vec(Jry) * (dy**2)).flatten()
 
         # take numerical integral over gamma, to get Ilocal
         if igamma > 0:
