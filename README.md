@@ -22,6 +22,8 @@ The dataset includes the firing rates of 41 Retina Ganglion Cells evoked by natu
     * decoding_analysis/        # (256 MB) parameters of the quads of RGCs tuning curves
 ```
 
+You can find the dataset for notebook 3 is in [Google-Drive](https://drive.google.com/drive/folders/1smXscp7ROusgSaBd9ZyKcmYmpgOHuEu7?usp=sharing).
+
 # Instructions
 
 - Run notebooks in notebook/
